@@ -1,0 +1,15 @@
+*~
+lib
+*.so
+*.pcd
+*.cop
+*.user
+bin
+build
+build_debug
+*met
+untitled*
+.tags
+*.swp
+*.json
+doc
