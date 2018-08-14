@@ -21,7 +21,7 @@ void getData(u_char* data, size_t cols, std::vector<double>& info)
   info.resize(cols);
   for (size_t i = 0; i < cols; i++)
   {
-    info[i] = (double(data[cols + i] << 8) + double(data[2 * cols + i])) / 64.0;
+    info[i] = sqrt((double(data[cols + i] << 8) + double(data[2 * cols + i])) / 64.0);
     ;
   }
 }
@@ -40,7 +40,7 @@ void getDataAVX512(u_char* data, size_t cols, std::vector<double>& info)
                                     (double(data[4 * i + 2 + cols] << 8) + double(data[4 * i + 2 * cols + 2])),
                                     (double(data[4 * i + 1 + cols] << 8) + double(data[4 * i + 2 * cols + 1])),
                                     (double(data[4 * i + cols] << 8) + double(data[4 * i + 2 * cols])));
-    result = _mm512_mul_pd(divisor, dividend);
+    result = _mm512_sqrt_pd(_mm512_mul_pd(divisor, dividend));
     info[size_t(4 * i)] = result[0];
     info[size_t(4 * i + 1)] = result[1];
     info[size_t(4 * i + 2)] = result[2];
@@ -49,25 +49,6 @@ void getDataAVX512(u_char* data, size_t cols, std::vector<double>& info)
     info[size_t(4 * i + 5)] = result[5];
     info[size_t(4 * i + 6)] = result[6];
     info[size_t(4 * i + 7)] = result[7];
-  }
-}
-
-void getDataAVX2(u_char* data, size_t cols, std::vector<double>& info)
-{
-  __m256d dividend = _mm256_set_pd(1 / 64.0, 1 / 64.0, 1 / 64.0, 1 / 64.0);
-  info.resize(cols);
-  __m256d result;
-  for (size_t i = 0; i < cols / 4; i++)
-  {
-    __m256d divisor = _mm256_set_pd((double(data[4 * i + 3 + cols] << 8) + double(data[4 * i + 2 * cols + 3])),
-                                    (double(data[4 * i + 2 + cols] << 8) + double(data[4 * i + 2 * cols + 2])),
-                                    (double(data[4 * i + 1 + cols] << 8) + double(data[4 * i + 2 * cols + 1])),
-                                    (double(data[4 * i + cols] << 8) + double(data[4 * i + 2 * cols])));
-    result = _mm256_mul_pd(divisor, dividend);
-    info[size_t(4 * i)] = result[0];
-    info[size_t(4 * i + 1)] = result[1];
-    info[size_t(4 * i + 2)] = result[2];
-    info[size_t(4 * i + 3)] = result[3];
   }
 }
 
@@ -97,13 +78,6 @@ int main(int argc, char** argv)
   getData(data, cols, info);
   double time_normal = timestamp() - tstart_normal;
 
-  // AVX2
-  std::cout << "Computing with avx" << std::endl;
-  std::vector<double> info_avx2;
-  double tstart_avx2 = timestamp();
-  getDataAVX2(data, cols, info_avx2);
-  double time_avx2 = timestamp() - tstart_avx2;
-
   // AVX512
   std::vector<double> info_avx512;
   std::cout << "Computing with avx512" << std::endl;
@@ -113,9 +87,7 @@ int main(int argc, char** argv)
 
   // Display difference
   std::cout << "Time normal: " << time_normal << " s" << std::endl;
-  std::cout << "Time AVX2:   " << time_avx2 << " s" << std::endl;
   std::cout << "Time AVX512: " << time_avx512 << " s" << std::endl;
-  std::cout << "Time improvement AVX2: " << time_normal / time_avx2 << std::endl;
   std::cout << "Time improvement AVX512: " << time_normal / time_avx512 << std::endl;
 
   // Write to file
@@ -123,8 +95,7 @@ int main(int argc, char** argv)
   file.open("out.csv");
   for (size_t i = 0; i < cols; i++)
   {
-    file << info[size_t(i)] << "," << info_avx2[size_t(i)];
-    file << "," << info_avx512[size_t(i)];
+    file << info[size_t(i)] << "," << info_avx512[size_t(i)];
     file << std::endl;
   }
   file.close();
